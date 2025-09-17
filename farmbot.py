@@ -549,7 +549,10 @@ async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_fil
         await mod_list_file.save(ModListPath)
     os.chmod(NewSavePath, 0o664)
     shutil.chown(NewSavePath, group="factorio")
-    await ctx.respond(f"File `{save_file.filename}` successfully uploaded to new stash `{NewStashName}`.")
+    Response = f"File `{save_file.filename}` successfully uploaded to new stash `{NewStashName}`."
+    if mod_list_file:
+        Response = f"File `{save_file.filename}` and `{mod_list_file.filename}` successfully uploaded to new stash `{NewStashName}`."
+    await ctx.respond(Response)
 
 
 @bot.slash_command(guild_ids=config['guilds'], description="Upload mod-list.json to specified stash")
