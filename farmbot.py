@@ -578,7 +578,7 @@ async def uploadmodlistjson(ctx, mod_list_file: discord.Attachment, save: str):
     if not ModListFilter.match(mod_list_file.filename):
         await ctx.respond(f"Filename uses illegal characters, aborting.\nAllowed Characters are `A-Za-z0-9` for the first character, and `A-Za-z0-9_ -` for subsequent characters."); return
     StashPath = Path(f"{config['factorio_path']}/{convert_save_name_to_stash_name(save)}")
-    ModListPath = f"{str(StashPath)}/{mod_list_file.filename}"
+    ModListPath = f"{str(StashPath)}/mod-list.json"
     await mod_list_file.save(ModListPath)
     await ctx.respond(f"File `{mod_list_file.filename}` successfully uploaded to stash `{save}`.")
 
