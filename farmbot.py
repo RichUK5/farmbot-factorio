@@ -143,9 +143,6 @@ def get_factorio_current_save():
 
 
 ModListFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.json$')
-def get_factorio_current_save():
-    SavePath = Path(f"{config['factorio_path']}/saves")
-    return SavePath, get_factorio_save_names(SavePath)
 
 
 def get_factorio_stashes():
