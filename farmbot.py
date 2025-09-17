@@ -521,7 +521,7 @@ async def showsaves(ctx):
     required=True
 )
 @option(
-    "modlist_json",
+    "mod_list_file",
     discord.Attachment,
     description="mod-list.json file to import",
     required=False
