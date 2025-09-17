@@ -142,6 +142,12 @@ def get_factorio_current_save():
     return SavePath, get_factorio_save_names(SavePath)
 
 
+ModListFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.json$')
+def get_factorio_current_save():
+    SavePath = Path(f"{config['factorio_path']}/saves")
+    return SavePath, get_factorio_save_names(SavePath)
+
+
 def get_factorio_stashes():
     return [ s for s in Path(config['factorio_path']).glob("stash-*") if s.is_dir ]
 
@@ -213,6 +219,10 @@ async def read_factorio_console_log():
             Output = Output + line
         ConsoleLogPosition = await f.tell()
     return Output.split('\n')
+
+
+async def autocomplete_list_stashes(ctx: discord.AutocompleteContext):
+  return [ convert_stash_name_to_save_name(s.name) for s in get_factorio_stashes() ]
 
 
 @bot.event
@@ -513,7 +523,13 @@ async def showsaves(ctx):
     description="Save file to import",
     required=True
 )
-async def uploadnewfactoriosave(ctx, save_file: discord.Attachment):
+@option(
+    "modlist_json",
+    discord.Attachment,
+    description="mod-list.json file to import",
+    required=False
+)
+async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_file: discord.Attachment):
     RequiredPermissionLevel = 10
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
         return
@@ -531,9 +547,40 @@ async def uploadnewfactoriosave(ctx, save_file: discord.Attachment):
     NewStash = create_factorio_stash(NewStashName)
     NewSavePath = f"{str(NewStash)}/{save_file.filename}"
     await save_file.save(NewSavePath)
+    if mod_list_file:
+        ModListPath = f"{str(NewStash)}/{mod_list_file.filename}"
+        await mod_list_file.save(ModListPath)
     os.chmod(NewSavePath, 0o664)
     shutil.chown(NewSavePath, group="factorio")
     await ctx.respond(f"File `{save_file.filename}` successfully uploaded to new stash `{NewStashName}`.")
+
+
+@bot.slash_command(guild_ids=config['guilds'], description="Upload mod-list.json to specified stash")
+@option(
+    "modlist_json",
+    discord.Attachment,
+    description="mod-list.json file to import",
+    required=True
+)
+@option(
+    "save",
+    str,
+    autocomplete=autocomplete_list_stashes,
+    description="Save file to target",
+    required=True
+)
+async def uploadmodlistjson(ctx, mod_list_file: discord.Attachment, save: str):
+    RequiredPermissionLevel = 10
+    if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
+        return
+    if mod_list_file.filename.__len__() > 128:
+        await ctx.respond(f"Filename is too long, aborting.\nMaximum permitted filename length is 128 characters."); return
+    if not ModListFilter.match(mod_list_file.filename):
+        await ctx.respond(f"Filename uses illegal characters, aborting.\nAllowed Characters are `A-Za-z0-9` for the first character, and `A-Za-z0-9_ -` for subsequent characters."); return
+    StashPath = Path(f"{config['factorio_path']}/{convert_save_name_to_stash_name(save)}")
+    ModListPath = f"{str(StashPath)}/{mod_list_file.filename}"
+    await mod_list_file.save(ModListPath)
+    await ctx.respond(f"File `{mod_list_file.filename}` successfully uploaded to stash `{save}`.")
 
 
 def clean_tagged_user(User):
@@ -734,16 +781,12 @@ async def removefarmbotuser(ctx, user: str, permission_level: int):
     await ctx.respond(f"Farmbot user removed for {user}")
 
 
-async def autocomplete_list_stashes(ctx: discord.AutocompleteContext):
-  return [ convert_stash_name_to_save_name(s.name) for s in get_factorio_stashes() ]
-
-
 @bot.slash_command(guild_ids=config['guilds'], description="Switch Save Files")
 @option(
     "save",
     str,
     autocomplete=autocomplete_list_stashes,
-    description="Save file to import",
+    description="Save file to load",
     required=True
 )
 async def activatefactoriostashedsave(ctx,save: str):
