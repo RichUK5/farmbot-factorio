@@ -6,10 +6,23 @@ from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
 
-config = json.load(open('config.json'))
+
+# Bot setup
 intents = discord.Intents.default()
 intents.members = True
 bot = discord.Bot(intents=intents)
+
+
+# Constants
+CONFIG = json.load(open('config.json'))
+FACTORIO_PATH = Path(CONFIG['factorio_path'])
+FACTORIO_PATH_STR = str(FACTORIO_PATH)
+FACTORIO_MOD_PATH = Path(f"{FACTORIO_PATH_STR}/mods")
+FACTORIO_MOD_PATH_STR = str(FACTORIO_MOD_PATH)
+FACTORIO_MOD_LIST_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json")
+FACTORIO_SAVES_PATH = Path(f"{FACTORIO_PATH_STR}/saves")
+FACTORIO_SAVES_PATH_STR = str(FACTORIO_SAVES_PATH)
+
 
 def write_userconfig():
     with open('userconfig.json', 'w') as f:
@@ -85,26 +98,26 @@ def status_factorio():
 
 
 def get_factorio_online_players():
-    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", config['rcon_port'], config['rcon_password'])
+    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     PlayersString = FactorioClient.send_command('/players online')
     return(PlayersString)
 
 
 def get_factorio_online_player_count():
-    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", config['rcon_port'], config['rcon_password'])
+    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     PlayerCountString = FactorioClient.send_command('/players online count')
     PlayerCount = int(re.match(r'^Online players \((\d+)\)', PlayerCountString).group(1))
     return(PlayerCount)
 
 
 def get_factorio_time():
-    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", config['rcon_port'], config['rcon_password'])
+    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     TimeString = FactorioClient.send_command('/time')
     return(TimeString)
 
 
 def get_factorio_whitelist():
-    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", config['rcon_port'], config['rcon_password'])
+    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     WhiteListString = FactorioClient.send_command('/whitelist get')
     return WhiteListString
 
@@ -124,13 +137,13 @@ def test_factorio_user_in_whitelist(User: str):
 
 
 def add_factorio_whitelist_user(User: str):
-    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", config['rcon_port'], config['rcon_password'])
+    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     Response = FactorioClient.send_command(f"/whitelist add {User}")
     return Response
 
 
 def remove_factorio_whitelist_user(User: str):
-    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", config['rcon_port'], config['rcon_password'])
+    FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     Response = FactorioClient.send_command(f"/whitelist remove {User}")
     return Response
 
@@ -142,8 +155,7 @@ def get_factorio_save_names(SavePath):
 
 SaveFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.zip$')
 def get_factorio_current_save():
-    SavePath = Path(f"{config['factorio_path']}/saves")
-    return SavePath, get_factorio_save_names(SavePath)
+    return FACTORIO_SAVES_PATH, get_factorio_save_names(FACTORIO_SAVES_PATH)
 
 
 ModListFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.json$')
@@ -151,8 +163,9 @@ ModListFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.json$')
 FactorioModUrl = "https://mods.factorio.com"
 FactorioModApiUrl = f"{FactorioModUrl}/api/mods"
 
+
 def get_factorio_stashes():
-    return [ s for s in Path(config['factorio_path']).glob("stash-*") if s.is_dir ]
+    return [ s for s in FACTORIO_PATH.glob("stash-*") if s.is_dir ]
 
 
 def convert_filename_to_stash_name(Filename):
@@ -292,12 +305,12 @@ async def on_ready():
     auto_update_check.start()
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="test command")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="test command")
 async def hello(ctx):
     await ctx.respond("hello")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Start Factorio server")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Start Factorio server")
 async def startfactorio(ctx):
     RequiredPermissionLevel = 5
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -308,7 +321,7 @@ async def startfactorio(ctx):
     await ctx.respond(f"```\n{status_factorio()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Stop Factorio server")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Stop Factorio server")
 async def stopfactorio(ctx):
     RequiredPermissionLevel = 5
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -319,7 +332,7 @@ async def stopfactorio(ctx):
     await ctx.respond(f"```\n{status_factorio()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Restart Factorio server")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Restart Factorio server")
 async def restartfactorio(ctx):
     RequiredPermissionLevel = 5
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -330,7 +343,7 @@ async def restartfactorio(ctx):
     await ctx.respond(f"```\n{status_factorio()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show Factorio server status")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show Factorio server status")
 async def statusfactorio(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -338,7 +351,7 @@ async def statusfactorio(ctx):
     await ctx.respond(f"```\n{status_factorio()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Check for Factorio updates")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Check for Factorio updates")
 async def checkupdatefactorio(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -347,7 +360,7 @@ async def checkupdatefactorio(ctx):
     await ctx.respond(factorio_version_output(VersionInfo))
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Update Factorio server")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Update Factorio server")
 async def updatefactorio(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -364,7 +377,7 @@ async def updatefactorio(ctx):
             await ctx.respond(f"Update aborted, {OnlinePlayerCount} user(s) online")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Enable channel update notifications")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Enable channel update notifications")
 async def enableupdatenotifications(ctx):
     RequiredPermissionLevel = 10
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -381,7 +394,7 @@ async def enableupdatenotifications(ctx):
         await ctx.respond("Update notifications were already enabled, no changes made")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Disable channel update notifications")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Disable channel update notifications")
 async def disableupdatenotifications(ctx):
     RequiredPermissionLevel = 10
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -397,7 +410,7 @@ async def disableupdatenotifications(ctx):
         await ctx.respond("Update notifications were not enabled, no changes made.")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Enable automatic updates")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Enable automatic updates")
 async def enableautomaticupdates(ctx):
     RequiredPermissionLevel = 10
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -413,7 +426,7 @@ async def enableautomaticupdates(ctx):
         await ctx.respond("Automatic updates were already enabled, no changes made")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Disable automatic updates")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Disable automatic updates")
 async def disableautomaticupdates(ctx):
     RequiredPermissionLevel = 10
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -426,7 +439,7 @@ async def disableautomaticupdates(ctx):
         await ctx.respond("Automatic updates were not enabled, no changes made")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show online players")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show online players")
 async def playersonline(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -434,7 +447,7 @@ async def playersonline(ctx):
     await ctx.respond(f"```\n{get_factorio_online_players()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show time elapsed in current game")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show time elapsed in current game")
 async def showfactoriotime(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -459,7 +472,7 @@ async def registerfarmbotuser(ctx):
     await ctx.respond(f"Farmbot user created for {ctx.author.name} with permission level 1")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Register your factorio username to your farmbot user, and add yourself to the whitelist")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Register your factorio username to your farmbot user, and add yourself to the whitelist")
 async def registerfactoriousername(ctx, username):
     if not re.match(r'^[A-Za-z0-9._-]{1,60}$', username):
         await ctx.respond(f"{username} is not a valid factorio username"); return
@@ -490,7 +503,7 @@ def get_factorio_presence_state(FbUserIndex):
         return False
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Enable notifications of when you join and leave the server.")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Enable notifications of when you join and leave the server.")
 async def enablefactoriopresence(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -510,7 +523,7 @@ async def enablefactoriopresence(ctx):
         return
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Disable notifications of when you join and leave the server.")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Disable notifications of when you join and leave the server.")
 async def disablefactoriopresence(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -530,7 +543,7 @@ async def disablefactoriopresence(ctx):
         return
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show factorio server whitelist")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show factorio server whitelist")
 async def showfactoriowhitelist(ctx):
     RequiredPermissionLevel = 1
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -538,7 +551,7 @@ async def showfactoriowhitelist(ctx):
     await ctx.respond(f"```\n{get_factorio_whitelist()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Add user to factorio server whitelist")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Add user to factorio server whitelist")
 async def addfactoriowhitelistuser(ctx, username):
     RequiredPermissionLevel = 5
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -550,7 +563,7 @@ async def addfactoriowhitelistuser(ctx, username):
         await ctx.respond(f"User {username} already exists in whitelist")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Remove user from factorio server whitelist")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Remove user from factorio server whitelist")
 async def removefactoriowhitelistuser(ctx, username):
     RequiredPermissionLevel = 5
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -568,7 +581,7 @@ def get_saves_output():
     return f"Current Save: `{CurrentSaveName}`\nStashed Saves:\n- `{'`\n- `'.join(StashedSaveNames)}`"
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show saves")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show saves")
 async def showsaves(ctx):
     RequiredPermissionLevel = 5
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
@@ -576,7 +589,7 @@ async def showsaves(ctx):
     await ctx.respond(get_saves_output())
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Upload save file to new stash")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Upload save file to new stash")
 @option(
     "save_file",
     discord.Attachment,
@@ -618,7 +631,7 @@ async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_fil
     await ctx.respond(Response)
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Upload mod-list.json to specified stash")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Upload mod-list.json to specified stash")
 @option(
     "modlist_json",
     discord.Attachment,
@@ -640,7 +653,7 @@ async def uploadmodlistjson(ctx, mod_list_file: discord.Attachment, save: str):
         await ctx.respond(f"Filename is too long, aborting.\nMaximum permitted filename length is 128 characters."); return
     if not ModListFilter.match(mod_list_file.filename):
         await ctx.respond(f"Filename uses illegal characters, aborting.\nAllowed Characters are `A-Za-z0-9` for the first character, and `A-Za-z0-9_ -` for subsequent characters."); return
-    StashPath = Path(f"{config['factorio_path']}/{convert_save_name_to_stash_name(save)}")
+    StashPath = Path(f"{FACTORIO_PATH_STR}/{convert_save_name_to_stash_name(save)}")
     ModListPath = f"{str(StashPath)}/mod-list.json"
     await mod_list_file.save(ModListPath)
     await ctx.respond(f"File `{mod_list_file.filename}` successfully uploaded to stash `{save}`.")
@@ -703,7 +716,7 @@ async def test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return False
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Create farmbot user")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Create farmbot user")
 @option(
     "user",
     str,
@@ -749,7 +762,7 @@ async def createfarmbotuser(ctx, user: str, permission_level: int = 1):
     await ctx.respond(f"Farmbot user created for {user} with permission level {NewFbUser['permission_level']}")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show farmbot user permission level")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show farmbot user permission level")
 @option(
     "user",
     str,
@@ -767,7 +780,7 @@ async def showfarmbotuser(ctx, user):
         await ctx.respond(f"FarmBot user for {user} not found")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Show farmbot user permission level")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show farmbot user permission level")
 @option(
     "user",
     str,
@@ -782,7 +795,7 @@ async def showmyfarmbotuser(ctx):
         await ctx.respond(f"FarmBot user for {ctx.author.name} not found")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Edit farmbot user permission level")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Edit farmbot user permission level")
 @option(
     "user",
     str,
@@ -844,7 +857,7 @@ async def removefarmbotuser(ctx, user: str, permission_level: int):
     await ctx.respond(f"Farmbot user removed for {user}")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Switch Save Files")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Switch Save Files")
 @option(
     "save",
     str,
@@ -857,7 +870,7 @@ async def activatefactoriostashedsave(ctx,save: str):
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
         return
     await ctx.respond(f"Switching to save `{save}`")
-    SavePath = Path(f"{config['factorio_path']}/{convert_save_name_to_stash_name(save)}")
+    SavePath = Path(f"{FACTORIO_PATH_STR}/{convert_save_name_to_stash_name(save)}")
     activate_factorio_save(SavePath)
     await ctx.respond(f"Switch Complete.\n```\n{status_factorio()}\n```\n{get_saves_output()}")
 
@@ -879,7 +892,7 @@ def set_factorio_server_name(ServerName: str):
         FactorioConfigFile.truncate()
         FactorioConfigFile.write(new_contents)
 
-@bot.slash_command(guild_ids=config['guilds'], description="Set the factorio server name")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Set the factorio server name")
 @option(
     "servername",
     str,
@@ -905,7 +918,7 @@ def set_factorio_server_description(ServerDescription: str):
         FactorioConfigFile.write(new_contents)
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Set the factorio server description")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Set the factorio server description")
 @option(
     "serverdescription",
     str,
@@ -970,7 +983,7 @@ if 'automatic_updates' not in userconfig:
     userconfig['automatic_updates'] = False
 if 'farmbot_users' not in userconfig:
     userconfig['farmbot_users'] = []
-for Admin in config['farmbot_default_admin_discord_users']:
+for Admin in CONFIG['farmbot_default_admin_discord_users']:
     if not userconfig['farmbot_users'] or Admin['id'] not in [ u['id'] for u in userconfig['farmbot_users'] ]:
         NewFbUser = {
             'id': Admin['id'],
@@ -983,4 +996,4 @@ for Admin in config['farmbot_default_admin_discord_users']:
 write_userconfig()
 
 
-bot.run(config['token'])
+bot.run(CONFIG['token'])
