@@ -188,9 +188,6 @@ def create_factorio_stash(NewStashName):
 
 
 def update_factorio_mods(Mods: list[str]):
-    #if Mod in FactorioBuiltInMods:
-    #    return None
-    #ModInfo = urllib.request.urlopen(f"{FactorioModApiUrl}/{Mod}").read()
     ModsInfoParams = urllib.parse.urlencode({"namelist": ','.join(Mods)})
     ModsInfoResponse = urllib.request.urlopen(f"{FactorioModApiUrl}?{ModsInfoParams}").read()
     ModsInfoObj = json.loads(ModsInfoResponse)
@@ -227,8 +224,6 @@ def activate_mod_list(ModListFile):
     with open(ModListFile, 'w') as f:
         json.dump(ModList, f, indent=2)
     update_factorio_mods([mod['name'] for mod in ModList['mods']])
-    #for Mod in ModList['mods']:
-    #    update_factorio_mod(ModList['name'])
 
 
 def activate_factorio_save(Stash):
@@ -261,7 +256,6 @@ def activate_factorio_save(Stash):
     Stash.rename(CurrentSavePath)
 
     activate_mod_list(CurrentModListPath)
-    # inspect mod-list.json for mods to install
     time.sleep(1)
     start_factorio()
     time.sleep(10)
