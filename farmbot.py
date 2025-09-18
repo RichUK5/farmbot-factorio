@@ -189,18 +189,27 @@ def convert_save_name_to_stash_name(SaveName):
 
 
 def create_factorio_stash(NewStashName):
-    FactorioPath = Path(config['factorio_path'])
     Stashes = get_factorio_stashes()
     if Stashes and NewStashName in [ s.name for s in Stashes ]:
         raise ValueError('Stash already exists')
-    Path.mkdir(f"{FactorioPath}/{NewStashName}", mode=0o775, parents=False, exist_ok=False)
-    NewStash = Path(f"{FactorioPath}/{NewStashName}")
+    Path.mkdir(f"{FACTORIO_PATH_STR}/{NewStashName}", mode=0o775, parents=False, exist_ok=False)
+    NewStash = Path(f"{FACTORIO_PATH_STR}/{NewStashName}")
     shutil.chown(NewStash, group="factorio")
     Path.chmod(NewStash, mode=0o775)
     return NewStash
 
 
-def update_factorio_mods(Mods: list[str]):
+def get_factorio_mod_list_path():
+    return Path(f"{str(FACTORIO_PATH)}/mods/mod-list.json")
+
+
+def get_factorio_mod_names():
+    ModList = get_factorio_mod_list()
+    ModList = get_factorio_enabled_mods(ModList)
+    return [mod['name'] for mod in ModList['mods']]
+
+
+def get_factorio_mods_info(Mods: list[str]):
     ModsInfoParams = urllib.parse.urlencode({"namelist": ','.join(Mods)})
     ModsInfoResponse = urllib.request.urlopen(f"{FactorioModApiUrl}?{ModsInfoParams}").read()
     ModsInfoObj = json.loads(ModsInfoResponse)
@@ -213,12 +222,19 @@ def update_factorio_mods(Mods: list[str]):
     for Mod in ModsInfo:
         Mod['releases'] = [Release for Release in Mod['releases'] if Release['info_json']['factorio_version'] == FactorioMajorVersion]
         Mod['releases'] = max(Mod['releases'], key=lambda node: node['released_at'])
+    
+    return ModsInfo
+
+
+def update_factorio_mods():
+    Mods = get_factorio_mod_names()
+    ModsInfo = get_factorio_mods_info(Mods)
 
     ModFiles = [ Mod['releases'] for Mod in ModsInfo ]
 
-    ModsDownloadParams = urllib.parse.urlencode({"username": config['factorio_service_username'], "token": config['factorio_service_token']})
+    ModsDownloadParams = urllib.parse.urlencode({"username": CONFIG['factorio_service_username'], "token": CONFIG['factorio_service_token']})
     for Mod in ModFiles:
-        DownloadPath = Path(f"{config['factorio_path']}/mods/{Mod['file_name']}")
+        DownloadPath = Path(f"{FACTORIO_MOD_PATH_STR}/{Mod['file_name']}")
         if DownloadPath.exists():
             continue
         DownloadUrl = f"{FactorioModUrl}{Mod['download_url']}?{ModsDownloadParams}"
@@ -230,17 +246,23 @@ def update_factorio_mods(Mods: list[str]):
             raise ValueError(f"Downloaded file {Mod['file_name']} hash {DownloadHash} does not match mod API hash {Mod['sha1']}")
 
 
-def activate_mod_list(ModListFile):
-    ModList = json.load(open(ModListFile))
-    # Remove any disabled mods
+def get_factorio_mod_list():
+    return json.load(open(FACTORIO_MOD_LIST_PATH))
+
+
+def get_factorio_enabled_mods(ModList):
     ModList['mods'] = [mod for mod in ModList['mods'] if mod['enabled'] == True]
-    with open(ModListFile, 'w') as f:
+    return ModList
+
+
+def filter_mod_list():
+    ModList = get_factorio_mod_list()
+    ModList = get_factorio_enabled_mods(ModList)
+    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
         json.dump(ModList, f, indent=2)
-    update_factorio_mods([mod['name'] for mod in ModList['mods']])
 
 
 def activate_factorio_save(Stash):
-    FactorioPath = Path(config['factorio_path'])
     # Place a default mod-list.json file into the stash if it is absent
     StashModListPath = Path(f"{str(Stash)}/mod-list.json")
     if not StashModListPath.exists():
@@ -258,17 +280,18 @@ def activate_factorio_save(Stash):
     time.sleep(1)
 
     # Pack current files into stash
-    CurrentSaveStashPath = Path(f"{str(FactorioPath)}/{CurrentSaveStashName}")
-    CurrentModListPath = Path(f"{str(FactorioPath)}/mods/mod-list.json")
-    CurrentSaveStashModListPath = Path(f"{str(FactorioPath)}/{CurrentSaveStashName}/mod-list.json")
+    CurrentSaveStashPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}")
+    CurrentSaveStashModListPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}/mod-list.json")
     CurrentSavePath.rename(CurrentSaveStashPath)
-    CurrentModListPath.rename(CurrentSaveStashModListPath)
+    FACTORIO_MOD_LIST_PATH.rename(CurrentSaveStashModListPath)
 
     # Unpack stash files
-    StashModListPath.rename(CurrentModListPath)
+    StashModListPath.rename(FACTORIO_MOD_LIST_PATH)
     Stash.rename(CurrentSavePath)
+    filter_mod_list()
 
-    activate_mod_list(CurrentModListPath)
+    update_factorio_mods()
+
     time.sleep(1)
     start_factorio()
     time.sleep(10)
@@ -455,7 +478,15 @@ async def showfactoriotime(ctx):
     await ctx.respond(f"```\n{get_factorio_time()}\n```")
 
 
-@bot.slash_command(guild_ids=config['guilds'], description="Register a farmbot user for yourself")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show current factorio mods")
+async def showfactoriomods(ctx):
+    RequiredPermissionLevel = 1
+    if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
+        return
+    await ctx.respond(f"```\n{'\n'.join(get_factorio_mod_names())}\n```")
+
+
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Register a farmbot user for yourself")
 async def registerfarmbotuser(ctx):
     FbUser = get_farmbot_user(ctx.author.id)
     if FbUser:
