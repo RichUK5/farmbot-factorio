@@ -12,5 +12,7 @@
             "global_name": "ExampleUser",
             "name": "exampleuser"
         }
-    ]
+    ],
+    "factorio_service_username": "yourfactoriousername",
+    "factorio_service_token": "yourfactorioservicetoken"
 }

@@ -1,4 +1,4 @@
-import discord, factorio_rcon, json, os, re, shutil, subprocess, sys, time, urllib.request
+import discord, factorio_rcon, hashlib, json, os, re, shutil, subprocess, sys, time, urllib.request
 from anyio import open_file, run
 from discord import option
 from discord.ext import tasks
@@ -148,6 +148,8 @@ def get_factorio_current_save():
 
 ModListFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.json$')
 
+FactorioModUrl = "https://mods.factorio.com"
+FactorioModApiUrl = f"{FactorioModUrl}/api/mods"
 
 def get_factorio_stashes():
     return [ s for s in Path(config['factorio_path']).glob("stash-*") if s.is_dir ]
@@ -185,6 +187,50 @@ def create_factorio_stash(NewStashName):
     return NewStash
 
 
+def update_factorio_mods(Mods: list[str]):
+    #if Mod in FactorioBuiltInMods:
+    #    return None
+    #ModInfo = urllib.request.urlopen(f"{FactorioModApiUrl}/{Mod}").read()
+    ModsInfoParams = urllib.parse.urlencode({"namelist": ','.join(Mods)})
+    ModsInfoResponse = urllib.request.urlopen(f"{FactorioModApiUrl}?{ModsInfoParams}").read()
+    ModsInfoObj = json.loads(ModsInfoResponse)
+    ModsInfo = ModsInfoObj['results']
+    # Filter out reserved mods
+    ModsInfo = [Mod for Mod in ModsInfo if Mod['summary'] != '[reserved]']
+    FactorioVersion = get_factorio_current_version()
+    FactorioMajorVersion = re.search(r'^\d+\.\d+', FactorioVersion).group(0)
+
+    for Mod in ModsInfo:
+        Mod['releases'] = [Release for Release in Mod['releases'] if Release['info_json']['factorio_version'] == FactorioMajorVersion]
+        Mod['releases'] = max(Mod['releases'], key=lambda node: node['released_at'])
+
+    ModFiles = [ Mod['releases'] for Mod in ModsInfo ]
+
+    ModsDownloadParams = urllib.parse.urlencode({"username": config['factorio_service_username'], "token": config['factorio_service_token']})
+    for Mod in ModFiles:
+        DownloadPath = Path(f"{config['factorio_path']}/mods/{Mod['file_name']}")
+        if DownloadPath.exists():
+            continue
+        DownloadUrl = f"{FactorioModUrl}{Mod['download_url']}?{ModsDownloadParams}"
+        
+        urllib.request.urlretrieve(DownloadUrl, DownloadPath)
+        with open(DownloadPath, 'rb', buffering=0) as f:
+            DownloadHash = hashlib.file_digest(f, 'sha1').hexdigest()
+        if DownloadHash != Mod['sha1']:
+            raise ValueError(f"Downloaded file {Mod['file_name']} hash {DownloadHash} does not match mod API hash {Mod['sha1']}")
+
+
+def activate_mod_list(ModListFile):
+    ModList = json.load(open(ModListFile))
+    # Remove any disabled mods
+    ModList['mods'] = [mod for mod in ModList['mods'] if mod['enabled'] == True]
+    with open(ModListFile, 'w') as f:
+        json.dump(ModList, f, indent=2)
+    update_factorio_mods([mod['name'] for mod in ModList['mods']])
+    #for Mod in ModList['mods']:
+    #    update_factorio_mod(ModList['name'])
+
+
 def activate_factorio_save(Stash):
     FactorioPath = Path(config['factorio_path'])
     # Place a default mod-list.json file into the stash if it is absent
@@ -213,6 +259,9 @@ def activate_factorio_save(Stash):
     # Unpack stash files
     StashModListPath.rename(CurrentModListPath)
     Stash.rename(CurrentSavePath)
+
+    activate_mod_list(CurrentModListPath)
+    # inspect mod-list.json for mods to install
     time.sleep(1)
     start_factorio()
     time.sleep(10)
