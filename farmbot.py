@@ -16,12 +16,16 @@ def write_userconfig():
         json.dump(userconfig, f, indent=2)
 
 
+def get_factorio_current_version():
+    FactorioVersionOutput = subprocess.check_output(['/opt/factorio/bin/x64/factorio', '--version'], universal_newlines=True)
+    return re.search(r'^Version: (\d+\.[0-9.]+) ', FactorioVersionOutput).group(1)
+
+
 def get_factorio_versions():
     FactorioVersionRequest = urllib.request.Request('https://factorio.com/api/latest-releases', headers={'User-Agent' : "Update Check Script v2"})
     FactorioVersions = urllib.request.urlopen(FactorioVersionRequest).read()
     FactorioVersionsObj = json.loads(FactorioVersions)
-    FactorioVersionOutput = subprocess.check_output(['/opt/factorio/bin/x64/factorio', '--version'], universal_newlines=True)
-    FactorioVersionCurrent = re.search(r'^Version: (\d+\.[0-9.]+) ', FactorioVersionOutput).group(1)
+    FactorioVersionCurrent = get_factorio_current_version()
     if (FactorioVersionCurrent != FactorioVersionsObj['stable']['headless']):
         UpdateRequired = True
     else:
