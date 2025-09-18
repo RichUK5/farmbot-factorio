@@ -187,15 +187,31 @@ def create_factorio_stash(NewStashName):
 
 def activate_factorio_save(Stash):
     FactorioPath = Path(config['factorio_path'])
+    # Place a default mod-list.json file into the stash if it is absent
+    StashModListPath = Path(f"{str(Stash)}/mod-list.json")
+    if not StashModListPath.exists():
+        shutil.copy(Path(f"mod-list.json.default"), Path(f"{Stash}/mod-list.json"))
+    
     Stashes = get_factorio_stashes()
     CurrentSavePath, CurrentSaveFiles = get_factorio_current_save()
     CurrentSaveStashName = convert_filename_to_stash_name(CurrentSaveFiles[0].name)
+
+    # Verify there is no stash name conflict with the current save
     if Stashes and CurrentSaveStashName in [ s.name for s in Stashes ]:
         raise ValueError(f"Stash {CurrentSaveStashName} already exists")
+    
     stop_factorio()
     time.sleep(1)
-    CurrentSaveStashPath = Path(f"{FactorioPath}/{CurrentSaveStashName}")
+
+    # Pack current files into stash
+    CurrentSaveStashPath = Path(f"{str(FactorioPath)}/{CurrentSaveStashName}")
+    CurrentModListPath = Path(f"{str(FactorioPath)}/mods/mod-list.json")
+    CurrentSaveStashModListPath = Path(f"{str(FactorioPath)}/{CurrentSaveStashName}/mod-list.json")
     CurrentSavePath.rename(CurrentSaveStashPath)
+    CurrentModListPath.rename(CurrentSaveStashModListPath)
+
+    # Unpack stash files
+    StashModListPath.rename(CurrentModListPath)
     Stash.rename(CurrentSavePath)
     time.sleep(1)
     start_factorio()
