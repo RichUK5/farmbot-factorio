@@ -21,6 +21,8 @@ FACTORIO_MOD_PATH = Path(f"{FACTORIO_PATH_STR}/mods")
 FACTORIO_MOD_PATH_STR = str(FACTORIO_MOD_PATH)
 FACTORIO_MOD_LIST_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json")
 FACTORIO_MOD_LIST_BACKUP_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json.bak")
+FACTORIO_MOD_SETTINGS_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-settings.dat")
+FACTORIO_MOD_SETTINGS_BACKUP_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-settings.dat.bak")
 FACTORIO_SAVES_PATH = Path(f"{FACTORIO_PATH_STR}/saves")
 FACTORIO_SAVES_PATH_STR = str(FACTORIO_SAVES_PATH)
 
@@ -313,6 +315,7 @@ def activate_factorio_save(Stash: Path):
     StashModListPath = Path(f"{str(Stash)}/mod-list.json")
     if not StashModListPath.exists():
         shutil.copy(Path(f"mod-list.json.default"), Path(f"{Stash}/mod-list.json"))
+    StashModSettingsPath = Path(f"{str(Stash)}/mod-settings.json")
     
     Stashes = get_factorio_stashes()
     CurrentSavePath, CurrentSaveFiles = get_factorio_current_save()
@@ -328,11 +331,16 @@ def activate_factorio_save(Stash: Path):
     # Pack current files into stash
     CurrentSaveStashPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}")
     CurrentSaveStashModListPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}/mod-list.json")
+    CurrentSaveStashModSettingsPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}/mod-settings.dat")
     CurrentSavePath.rename(CurrentSaveStashPath)
     FACTORIO_MOD_LIST_PATH.rename(CurrentSaveStashModListPath)
+    if FACTORIO_MOD_SETTINGS_PATH.exists():
+        FACTORIO_MOD_SETTINGS_PATH.rename(CurrentSaveStashModSettingsPath)
 
     # Unpack stash files
     StashModListPath.rename(FACTORIO_MOD_LIST_PATH)
+    if (StashModSettingsPath.exists()):
+        StashModSettingsPath.rename(FACTORIO_MOD_SETTINGS_PATH)
     Stash.rename(CurrentSavePath)
     generate_mod_list()
 
@@ -686,7 +694,13 @@ async def showsaves(ctx):
     description="mod-list.json file to import",
     required=False
 )
-async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_file: discord.Attachment):
+@option(
+    "mod_settings_file",
+    discord.Attachment,
+    description="mod-settings.dat file to import",
+    required=False
+)
+async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_file: discord.Attachment, mod_settings_file: discord.Attachment):
     RequiredPermissionLevel = 10
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
         return
@@ -704,14 +718,24 @@ async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_fil
     NewStash = create_factorio_stash(NewStashName)
     NewSavePath = f"{str(NewStash)}/{save_file.filename}"
     await save_file.save(NewSavePath)
-    if mod_list_file:
-        ModListPath = f"{str(NewStash)}/{mod_list_file.filename}"
-        await mod_list_file.save(ModListPath)
     os.chmod(NewSavePath, 0o664)
     shutil.chown(NewSavePath, group="factorio")
-    Response = f"File `{save_file.filename}` successfully uploaded to new stash `{NewStashName}`."
     if mod_list_file:
-        Response = f"File `{save_file.filename}` and `{mod_list_file.filename}` successfully uploaded to new stash `{NewStashName}`."
+        ModListPath = f"{str(NewStash)}/mod-list.json"
+        await mod_list_file.save(ModListPath)
+        os.chmod(ModListPath, 0o664)
+        shutil.chown(ModListPath, group="factorio")
+    if mod_settings_file:
+        ModSettingsPath = f"{str(NewStash)}/mod-settings.dat"
+        await mod_settings_file.save(ModSettingsPath)
+        os.chmod(ModSettingsPath, 0o664)
+        shutil.chown(ModSettingsPath, group="factorio")
+    Response = f"File `{save_file.filename}`"
+    if mod_list_file:
+        Response = f"{Response} & `{mod_list_file.filename}`"
+    if mod_settings_file:
+        Response = f"{Response} & `{mod_settings_file.filename}`"
+    Response = f"{Response} successfully uploaded to new stash `{NewStashName}`."
     await ctx.respond(Response)
 
 
