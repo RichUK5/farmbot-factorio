@@ -1,4 +1,4 @@
-import discord, factorio_rcon, hashlib, json, os, re, shutil, subprocess, sys, time, urllib.request
+import discord, factorio_rcon, grp, hashlib, json, os, re, shutil, subprocess, stat, sys, time, urllib.request
 from anyio import open_file, run
 from discord import option
 from discord.ext import tasks
@@ -20,6 +20,7 @@ FACTORIO_PATH_STR = str(FACTORIO_PATH)
 FACTORIO_MOD_PATH = Path(f"{FACTORIO_PATH_STR}/mods")
 FACTORIO_MOD_PATH_STR = str(FACTORIO_MOD_PATH)
 FACTORIO_MOD_LIST_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json")
+FACTORIO_MOD_LIST_BACKUP_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json.bak")
 FACTORIO_SAVES_PATH = Path(f"{FACTORIO_PATH_STR}/saves")
 FACTORIO_SAVES_PATH_STR = str(FACTORIO_SAVES_PATH)
 
@@ -159,6 +160,7 @@ def get_factorio_current_save():
 
 
 ModListFilter = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._ -]+.json$')
+ModFileFilter = re.compile(r'(.*)_\d+\.\d+\.\d+\.zip$')
 
 FactorioModUrl = "https://mods.factorio.com"
 FactorioModApiUrl = f"{FactorioModUrl}/api/mods"
@@ -256,6 +258,8 @@ def update_factorio_mods():
         DownloadUrl = f"{FactorioModUrl}{Mod['download_url']}?{ModsDownloadParams}"
         
         urllib.request.urlretrieve(DownloadUrl, DownloadPath)
+        os.chmod(DownloadPath, 0o664)
+        shutil.chown(DownloadPath, group="factorio")
         with open(DownloadPath, 'rb', buffering=0) as f:
             DownloadHash = hashlib.file_digest(f, 'sha1').hexdigest()
         if DownloadHash != Mod['sha1']:
@@ -266,19 +270,45 @@ def get_factorio_mod_list():
     return json.load(open(FACTORIO_MOD_LIST_PATH))
 
 
+def get_factorio_downloaded_mods():
+    ModFiles = FACTORIO_MOD_PATH.glob("*.zip")
+    ModFileNames = [ Mod.name for Mod in ModFiles if ModFileFilter.match(Mod.name)]
+    ModNames = [ ModFileFilter.search(Name).group(1) for Name in ModFileNames ]
+    return list(dict.fromkeys(ModNames))
+
 def get_factorio_enabled_mods(ModList):
     ModList['mods'] = [mod for mod in ModList['mods'] if mod['enabled'] == True]
     return ModList
 
 
-def filter_mod_list():
+def generate_mod_list():
     ModList = get_factorio_mod_list()
     ModList = get_factorio_enabled_mods(ModList)
+    EnabledMods = [ Mod['name'] for Mod in ModList['mods'] ]
+    DownloadedMods = get_factorio_downloaded_mods()
+    fix_file_permissions(FACTORIO_MOD_LIST_PATH, FACTORIO_MOD_LIST_BACKUP_PATH)
+    for Mod in DownloadedMods:
+        if Mod not in EnabledMods:
+            ModList['mods'] += [{'name': Mod, 'enabled': False}]
     with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
         json.dump(ModList, f, indent=2)
 
 
-def activate_factorio_save(Stash):
+def fix_file_permissions(Source: Path, Backup: Path):
+    # Check if group write bit is not set
+    if not bool(os.stat(Source).st_mode & stat.S_IWGRP):
+        if Backup.exists():
+            os.remove(Backup)
+        Source.rename(Backup)
+        shutil.copy(Backup, Source)
+        os.chmod(Source, 0o664)
+        os.remove(Backup)
+    # Check if group is not factorio
+    if grp.getgrgid(os.stat(Source).st_gid).gr_name != "factorio":
+        shutil.chown(Source, group="factorio")
+
+
+def activate_factorio_save(Stash: Path):
     # Place a default mod-list.json file into the stash if it is absent
     StashModListPath = Path(f"{str(Stash)}/mod-list.json")
     if not StashModListPath.exists():
@@ -304,7 +334,7 @@ def activate_factorio_save(Stash):
     # Unpack stash files
     StashModListPath.rename(FACTORIO_MOD_LIST_PATH)
     Stash.rename(CurrentSavePath)
-    filter_mod_list()
+    generate_mod_list()
 
     update_factorio_mods()
 
