@@ -113,6 +113,10 @@ def status_factorio():
     return('\n'.join(StatusCleanList))
 
 
+def get_factorio_status_code():
+    return subprocess.run("systemctl status factorio".split()).returncode
+
+
 def get_factorio_online_players():
     FactorioClient = factorio_rcon.RCONClient("127.0.0.1", CONFIG['rcon_port'], CONFIG['rcon_password'])
     PlayersString = FactorioClient.send_command('/players online')
@@ -287,9 +291,34 @@ def get_factorio_downloaded_mods():
     ModNames = [ ModFileFilter.search(Name).group(1) for Name in ModFileNames ]
     return list(dict.fromkeys(ModNames))
 
+
 def get_factorio_enabled_mods(ModList):
     ModList['mods'] = [mod for mod in ModList['mods'] if mod['enabled']]
     return ModList
+
+
+def add_factorio_mod(NewMod: str):
+    ModList = get_factorio_mod_list()
+    ModNames = [Mod for Mod in ModList['mods'] if Mod['name'] == NewMod]
+    if NewMod not in ModNames:
+        ModList['mods'] += [{'name': NewMod, 'enabled': True}]
+    else:
+        for Mod in ModList['mods']:
+            if Mod['name'] == NewMod:
+                Mod['enabled'] = True
+                break
+    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
+        json.dump(ModList, f, indent=2)
+
+
+def remove_factorio_mod(RemoveMod: str):
+    ModList = get_factorio_mod_list()
+    for Mod in ModList['mods']:
+        if Mod['name'] == RemoveMod:
+            Mod['enabled'] = False
+            break
+    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
+        json.dump(ModList, f, indent=2)
 
 
 def generate_mod_list():
@@ -381,7 +410,11 @@ async def read_factorio_console_log():
 
 
 async def autocomplete_list_stashes(ctx: discord.AutocompleteContext):
-  return [ convert_stash_name_to_save_name(s.name) for s in get_factorio_stashes() ]
+    return [ convert_stash_name_to_save_name(s.name) for s in get_factorio_stashes() ]
+
+
+async def autocomplete_list_enabled_mods(ctx: discord.AutocompleteContext):
+    return get_factorio_enabled_mod_names()
 
 
 @bot.event
@@ -556,6 +589,58 @@ async def checkfactoriomodupdates(ctx):
     await ctx.respond(f"```\n{'\n'.join(get_factorio_mod_updates())}\n```")
 
 
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Add mod to current factorio save. Stop factorio prior to use.")
+@option("mod_name", str, description="Mod to add; case sensitive", required=True)
+async def addfactoriomod(ctx, mod_name: str):
+    RequiredPermissionLevel = 10
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    
+    # Check if factorio service is stopped
+    if get_factorio_status_code() == 0:
+        await ctx.respond("Factorio is running, please stop factorio before altering adding/removing mods")
+        return
+
+    # Check if mod is already enabled
+    if mod_name in get_factorio_enabled_mod_names():
+        await ctx.respond(f"Mod `{mod_name}` is already installed and enabled")
+        return
+    
+    # Check if mod exists in mod portal
+    ModInfo = get_factorio_mods_info([mod_name])
+    if not ModInfo:
+        await ctx.respond(f"Mod `{mod_name}` not found in mod portal. Please check case and spelling.")
+
+    # Add mod to mod list and install
+    add_factorio_mod(mod_name)
+    update_factorio_mods()
+    
+    await ctx.respond(f"Mod `{mod_name}` added")
+
+
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Remove mod from current factorio save. Stop factorio prior to use.")
+@option("mod_name", str, description="Mod to add; case sensitive", required=True)
+async def removefactoriomod(ctx, mod_name: str):
+    RequiredPermissionLevel = 10
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    
+    # Check if factorio service is stopped
+    if get_factorio_status_code() == 0:
+        await ctx.respond("Factorio is running, please stop factorio before altering adding/removing mods")
+        return
+
+    # Check if mod is not enabled
+    if mod_name not in get_factorio_enabled_mod_names():
+        await ctx.respond(f"Mod `{mod_name}` is not enabled")
+        return
+    
+    # Disable mod in mod list
+    remove_factorio_mod(mod_name)
+    
+    await ctx.respond(f"Mod `{mod_name}` removed")
+
+
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Register a farmbot user for yourself")
 async def registerfarmbotuser(ctx):
     FbUser = get_farmbot_user(ctx.author.id)
@@ -661,7 +746,7 @@ async def showfactoriowhitelist(ctx):
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Add user to factorio server whitelist")
-async def addfactoriowhitelistuser(ctx, username):
+async def addfactoriowhitelistuser(ctx, username: str):
     RequiredPermissionLevel = 5
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return
@@ -673,7 +758,7 @@ async def addfactoriowhitelistuser(ctx, username):
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Remove user from factorio server whitelist")
-async def removefactoriowhitelistuser(ctx, username):
+async def removefactoriowhitelistuser(ctx, username: str):
     RequiredPermissionLevel = 5
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return
