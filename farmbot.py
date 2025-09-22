@@ -277,6 +277,12 @@ def get_factorio_mod_list():
     return json.load(open(FACTORIO_MOD_LIST_PATH))
 
 
+def write_factorio_mod_list(ModList):
+    fix_file_permissions(FACTORIO_MOD_LIST_PATH, FACTORIO_MOD_LIST_BACKUP_PATH)
+    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
+        json.dump(ModList, f, indent=2)
+
+
 def get_factorio_downloaded_mods():
     ModFiles = FACTORIO_MOD_PATH.glob("*.zip")
     ModFileNames = [ Mod.name for Mod in ModFiles if ModFileFilter.match(Mod.name)]
@@ -299,8 +305,7 @@ def add_factorio_mod(NewMod: str):
             if Mod['name'] == NewMod:
                 Mod['enabled'] = True
                 break
-    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
-        json.dump(ModList, f, indent=2)
+    write_factorio_mod_list(ModList)
 
 
 def remove_factorio_mod(RemoveMod: str):
@@ -309,8 +314,7 @@ def remove_factorio_mod(RemoveMod: str):
         if Mod['name'] == RemoveMod:
             Mod['enabled'] = False
             break
-    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
-        json.dump(ModList, f, indent=2)
+    write_factorio_mod_list(ModList)
 
 
 def generate_mod_list():
@@ -318,12 +322,10 @@ def generate_mod_list():
     ModList = get_factorio_enabled_mods(ModList)
     EnabledMods = [ Mod['name'] for Mod in ModList['mods'] ]
     DownloadedMods = get_factorio_downloaded_mods()
-    fix_file_permissions(FACTORIO_MOD_LIST_PATH, FACTORIO_MOD_LIST_BACKUP_PATH)
     for Mod in DownloadedMods:
         if Mod not in EnabledMods:
             ModList['mods'] += [{'name': Mod, 'enabled': False}]
-    with open(FACTORIO_MOD_LIST_PATH, 'w') as f:
-        json.dump(ModList, f, indent=2)
+    write_factorio_mod_list(ModList)
 
 
 def fix_file_permissions(Source: Path, Backup: Path):
