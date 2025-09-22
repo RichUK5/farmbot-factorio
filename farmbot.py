@@ -573,13 +573,6 @@ async def showfactoriomods(ctx):
         return
     await ctx.respond(f"```\n{'\n'.join(get_factorio_enabled_mod_names())}\n```")
 
-@bot.slash_command(guild_ids=CONFIG['guilds'], description="Show current factorio mods")
-async def checkfactoriomodupdates(ctx):
-    RequiredPermissionLevel = 1
-    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
-        return
-    await ctx.respond(f"```\n{'\n'.join(get_factorio_mod_updates())}\n```")
-
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Add mod to current factorio save. Stop factorio prior to use.")
 @option("mod_name", str, description="Mod to add; case sensitive", required=True)
@@ -633,7 +626,20 @@ async def removefactoriomod(ctx, mod_name: str):
     await ctx.respond(f"Mod `{mod_name}` removed")
 
 
-@bot.slash_command(guild_ids=CONFIG['guilds'], description="Update Factorio server")
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Check for factorio mod updates")
+async def checkupdatefactoriomods(ctx):
+    RequiredPermissionLevel = 1
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    ModUpdates = get_factorio_mod_updates()
+    
+    if ModUpdates:
+        await ctx.respond(f"Mod Updates found:\n- `{'`\n- `'.join(ModUpdates)}`")
+    else:
+        await ctx.respond("No mod updates found")
+
+
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Update Factorio mods")
 async def updatefactoriomods(ctx):
     RequiredPermissionLevel = 1
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
