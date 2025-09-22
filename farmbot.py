@@ -216,7 +216,7 @@ def create_factorio_stash(NewStashName):
     return NewStash
 
 
-def get_factorio_mod_names():
+def get_factorio_enabled_mod_names():
     ModList = get_factorio_mod_list()
     ModList = get_factorio_enabled_mods(ModList)
     return [mod['name'] for mod in ModList['mods']]
@@ -240,7 +240,7 @@ def get_factorio_mods_info(Mods: list[str]):
 
 
 def get_factorio_mod_updates():
-    Mods = get_factorio_mod_names()
+    Mods = get_factorio_enabled_mod_names()
     ModsInfo = get_factorio_mods_info(Mods)
 
     ModFiles = [ Mod['releases'] for Mod in ModsInfo ]
@@ -256,7 +256,7 @@ def get_factorio_mod_updates():
 
 
 def update_factorio_mods():
-    Mods = get_factorio_mod_names()
+    Mods = get_factorio_enabled_mod_names()
     ModsInfo = get_factorio_mods_info(Mods)
 
     ModFiles = [ Mod['releases'] for Mod in ModsInfo ]
@@ -546,7 +546,7 @@ async def showfactoriomods(ctx):
     RequiredPermissionLevel = 1
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return
-    await ctx.respond(f"```\n{'\n'.join(get_factorio_mod_names())}\n```")
+    await ctx.respond(f"```\n{'\n'.join(get_factorio_enabled_mod_names())}\n```")
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Show current factorio mods")
 async def checkfactoriomodupdates(ctx):
@@ -687,7 +687,7 @@ async def removefactoriowhitelistuser(ctx, username):
 def get_saves_output():
     CurrentSaveName = convert_filename_to_save_name(get_factorio_current_save()[1][0].name)
     StashedSaveNames = [ convert_stash_name_to_save_name(s.name) for s in get_factorio_stashes() ]
-    return f"Current Save: `{CurrentSaveName}`\nEnabled mods:\n```\n{'\n'.join(get_factorio_mod_names())}\n```\nStashed Saves:\n- `{'`\n- `'.join(StashedSaveNames)}`"
+    return f"Current Save: `{CurrentSaveName}`\nEnabled mods:\n```\n{'\n'.join(get_factorio_enabled_mod_names())}\n```\nStashed Saves:\n- `{'`\n- `'.join(StashedSaveNames)}`"
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Show saves")
