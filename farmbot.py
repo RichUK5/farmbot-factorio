@@ -16,15 +16,16 @@ bot = discord.Bot(intents=intents)
 # Constants
 CONFIG = json.load(open('config.json'))
 FACTORIO_PATH = Path(CONFIG['factorio_path'])
-FACTORIO_PATH_STR = str(FACTORIO_PATH)
-FACTORIO_MOD_PATH = Path(f"{FACTORIO_PATH_STR}/mods")
-FACTORIO_MOD_PATH_STR = str(FACTORIO_MOD_PATH)
-FACTORIO_MOD_LIST_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json")
-FACTORIO_MOD_LIST_BACKUP_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-list.json.bak")
-FACTORIO_MOD_SETTINGS_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-settings.dat")
-FACTORIO_MOD_SETTINGS_BACKUP_PATH = Path(f"{FACTORIO_PATH_STR}/mods/mod-settings.dat.bak")
-FACTORIO_SAVES_PATH = Path(f"{FACTORIO_PATH_STR}/saves")
-FACTORIO_SAVES_PATH_STR = str(FACTORIO_SAVES_PATH)
+FACTORIO_MOD_PATH = FACTORIO_PATH.joinpath("mods")
+FACTORIO_MOD_LIST_FILE_NAME = "mod-list.json"
+FACTORIO_MOD_LIST_PATH = FACTORIO_MOD_PATH.joinpath(FACTORIO_MOD_LIST_FILE_NAME)
+FACTORIO_MOD_LIST_BACKUP_FILE_NAME = "mod-list.json.bak"
+FACTORIO_MOD_LIST_BACKUP_PATH = FACTORIO_MOD_PATH.joinpath(FACTORIO_MOD_LIST_BACKUP_FILE_NAME)
+FACTORIO_MOD_SETTINGS_FILE_NAME = "mod-settings.dat"
+FACTORIO_MOD_SETTINGS_PATH = FACTORIO_MOD_PATH.joinpath(FACTORIO_MOD_SETTINGS_FILE_NAME)
+FACTORIO_MOD_SETTINGS_BACKUP_FILE_NAME = "mod-settings.dat.bak"
+FACTORIO_MOD_SETTINGS_BACKUP_PATH = FACTORIO_MOD_PATH.joinpath(FACTORIO_MOD_SETTINGS_FILE_NAME)
+FACTORIO_SAVES_PATH = FACTORIO_PATH.joinpath("saves")
 
 
 def write_userconfig():
@@ -196,15 +197,11 @@ def create_factorio_stash(NewStashName):
     Stashes = get_factorio_stashes()
     if Stashes and NewStashName in [ s.name for s in Stashes ]:
         raise ValueError('Stash already exists')
-    Path.mkdir(f"{FACTORIO_PATH_STR}/{NewStashName}", mode=0o775, parents=False, exist_ok=False)
-    NewStash = Path(f"{FACTORIO_PATH_STR}/{NewStashName}")
+    NewStash = FACTORIO_PATH.joinpath(NewStashName)
+    Path.mkdir(NewStash, mode=0o775, parents=False, exist_ok=False)
     shutil.chown(NewStash, group="factorio")
     Path.chmod(NewStash, mode=0o775)
     return NewStash
-
-
-def get_factorio_mod_list_path():
-    return Path(f"{str(FACTORIO_PATH)}/mods/mod-list.json")
 
 
 def get_factorio_mod_names():
@@ -236,10 +233,10 @@ def get_factorio_mod_updates():
 
     ModFiles = [ Mod['releases'] for Mod in ModsInfo ]
 
-    ModFiles = [ Mod for Mod in ModFiles if not Path(f"{FACTORIO_MOD_PATH_STR}/{Mod['file_name']}").exists() ]
+    ModFiles = [ Mod for Mod in ModFiles if not FACTORIO_MOD_PATH.joinpath(Mod['file_name']).exists() ]
 
     for Mod in ModFiles:
-        Mod['DownloadPath'] = Path(f"{FACTORIO_MOD_PATH_STR}/{Mod['file_name']}")
+        Mod['DownloadPath'] = FACTORIO_MOD_PATH.joinpath(Mod['file_name'])
         if Mod['DownloadPath'].exists():
             Mod['UpdateRequired'] = False
             continue
@@ -254,7 +251,7 @@ def update_factorio_mods():
 
     ModsDownloadParams = urllib.parse.urlencode({"username": CONFIG['factorio_service_username'], "token": CONFIG['factorio_service_token']})
     for Mod in ModFiles:
-        DownloadPath = Path(f"{FACTORIO_MOD_PATH_STR}/{Mod['file_name']}")
+        DownloadPath = FACTORIO_MOD_PATH.joinpath(Mod['file_name'])
         if DownloadPath.exists():
             continue
         DownloadUrl = f"{FactorioModUrl}{Mod['download_url']}?{ModsDownloadParams}"
@@ -312,10 +309,10 @@ def fix_file_permissions(Source: Path, Backup: Path):
 
 def activate_factorio_save(Stash: Path):
     # Place a default mod-list.json file into the stash if it is absent
-    StashModListPath = Path(f"{str(Stash)}/mod-list.json")
+    StashModListPath = Stash.joinpath(FACTORIO_MOD_LIST_FILE_NAME)
     if not StashModListPath.exists():
-        shutil.copy(Path(f"mod-list.json.default"), Path(f"{Stash}/mod-list.json"))
-    StashModSettingsPath = Path(f"{str(Stash)}/mod-settings.json")
+        shutil.copy(Path("mod-list.json.default"), StashModListPath)
+    StashModSettingsPath = Stash.joinpath("mod-settings.json")
     
     Stashes = get_factorio_stashes()
     CurrentSavePath, CurrentSaveFiles = get_factorio_current_save()
@@ -329,9 +326,9 @@ def activate_factorio_save(Stash: Path):
     time.sleep(1)
 
     # Pack current files into stash
-    CurrentSaveStashPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}")
-    CurrentSaveStashModListPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}/mod-list.json")
-    CurrentSaveStashModSettingsPath = Path(f"{FACTORIO_PATH_STR}/{CurrentSaveStashName}/mod-settings.dat")
+    CurrentSaveStashPath = FACTORIO_PATH.joinpath(CurrentSaveStashName)
+    CurrentSaveStashModListPath = CurrentSaveStashPath.joinpath(FACTORIO_MOD_LIST_FILE_NAME)
+    CurrentSaveStashModSettingsPath = CurrentSaveStashPath.joinpath(FACTORIO_MOD_SETTINGS_FILE_NAME)
     CurrentSavePath.rename(CurrentSaveStashPath)
     FACTORIO_MOD_LIST_PATH.rename(CurrentSaveStashModListPath)
     if FACTORIO_MOD_SETTINGS_PATH.exists():
@@ -716,17 +713,17 @@ async def uploadnewfactoriosave(ctx, save_file: discord.Attachment, mod_list_fil
         await ctx.respond(f"Stash for filename already exists, aborting.")
         return
     NewStash = create_factorio_stash(NewStashName)
-    NewSavePath = f"{str(NewStash)}/{save_file.filename}"
+    NewSavePath = NewStash.joinpath(save_file.filename)
     await save_file.save(NewSavePath)
     os.chmod(NewSavePath, 0o664)
     shutil.chown(NewSavePath, group="factorio")
     if mod_list_file:
-        ModListPath = f"{str(NewStash)}/mod-list.json"
+        ModListPath = NewStash.joinpath(FACTORIO_MOD_LIST_FILE_NAME)
         await mod_list_file.save(ModListPath)
         os.chmod(ModListPath, 0o664)
         shutil.chown(ModListPath, group="factorio")
     if mod_settings_file:
-        ModSettingsPath = f"{str(NewStash)}/mod-settings.dat"
+        ModSettingsPath = NewStash.joinpath(FACTORIO_MOD_SETTINGS_FILE_NAME)
         await mod_settings_file.save(ModSettingsPath)
         os.chmod(ModSettingsPath, 0o664)
         shutil.chown(ModSettingsPath, group="factorio")
@@ -761,8 +758,8 @@ async def uploadmodlistjson(ctx, mod_list_file: discord.Attachment, save: str):
         await ctx.respond(f"Filename is too long, aborting.\nMaximum permitted filename length is 128 characters."); return
     if not ModListFilter.match(mod_list_file.filename):
         await ctx.respond(f"Filename uses illegal characters, aborting.\nAllowed Characters are `A-Za-z0-9` for the first character, and `A-Za-z0-9_ -` for subsequent characters."); return
-    StashPath = Path(f"{FACTORIO_PATH_STR}/{convert_save_name_to_stash_name(save)}")
-    ModListPath = f"{str(StashPath)}/mod-list.json"
+    StashPath = FACTORIO_PATH.joinpath(convert_save_name_to_stash_name(save))
+    ModListPath = StashPath.joinpath(FACTORIO_MOD_LIST_FILE_NAME)
     await mod_list_file.save(ModListPath)
     await ctx.respond(f"File `{mod_list_file.filename}` successfully uploaded to stash `{save}`.")
 
@@ -978,7 +975,7 @@ async def activatefactoriostashedsave(ctx,save: str):
     if await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel) != True:
         return
     await ctx.respond(f"Switching to save `{save}`")
-    SavePath = Path(f"{FACTORIO_PATH_STR}/{convert_save_name_to_stash_name(save)}")
+    SavePath = FACTORIO_PATH.joinpath(convert_save_name_to_stash_name(save))
     activate_factorio_save(SavePath)
     await ctx.respond(f"Switch Complete.\n```\n{status_factorio()}\n```\n{get_saves_output()}")
 
