@@ -438,9 +438,13 @@ async def stopfactorio(ctx):
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return
     await ctx.respond("Stopping Factorio")
-    stop_factorio()
-    time.sleep(1)
-    await ctx.respond(f"```\n{status_factorio()}\n```")
+    OnlinePlayerCount = get_factorio_online_player_count()
+    if OnlinePlayerCount == 0:
+        stop_factorio()
+        time.sleep(1)
+        await ctx.respond(f"```\n{status_factorio()}\n```")
+    else:
+        await ctx.respond(f"Stop aborted, {OnlinePlayerCount} user(s) online")
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Restart Factorio server")
@@ -449,9 +453,13 @@ async def restartfactorio(ctx):
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return
     await ctx.respond("Restarting Factorio")
-    restart_factorio()
-    time.sleep(10)
-    await ctx.respond(f"```\n{status_factorio()}\n```")
+    OnlinePlayerCount = get_factorio_online_player_count()
+    if OnlinePlayerCount == 0:
+        restart_factorio()
+        time.sleep(10)
+        await ctx.respond(f"```\n{status_factorio()}\n```")
+    else:
+        await ctx.respond(f"Restart aborted, {OnlinePlayerCount} user(s) online")
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Show Factorio server status")
