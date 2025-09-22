@@ -246,17 +246,9 @@ def get_factorio_mods_info(Mods: list[str]):
 def get_factorio_mod_updates():
     Mods = get_factorio_enabled_mod_names()
     ModsInfo = get_factorio_mods_info(Mods)
-
     ModFiles = [ Mod['releases'] for Mod in ModsInfo ]
-
     ModFiles = [ Mod for Mod in ModFiles if not FACTORIO_MOD_PATH.joinpath(Mod['file_name']).exists() ]
-
-    for Mod in ModFiles:
-        Mod['DownloadPath'] = FACTORIO_MOD_PATH.joinpath(Mod['file_name'])
-        if Mod['DownloadPath'].exists():
-            Mod['UpdateRequired'] = False
-            continue
-        Mod['UpdateRequired'] = True
+    return [ Mod['file_name'] for Mod in ModFiles ]
 
 
 def update_factorio_mods():
@@ -639,6 +631,26 @@ async def removefactoriomod(ctx, mod_name: str):
     remove_factorio_mod(mod_name)
     
     await ctx.respond(f"Mod `{mod_name}` removed")
+
+
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Update Factorio server")
+async def updatefactoriomods(ctx):
+    RequiredPermissionLevel = 1
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    ModUpdates = get_factorio_mod_updates()
+    
+    if ModUpdates:
+        await ctx.respond(f"Mod Updates found:\n- `{'`\n- `'.join(ModUpdates)}`")
+        OnlinePlayerCount = get_factorio_online_player_count()
+        if OnlinePlayerCount == 0:
+            stop_factorio()
+            update_factorio_mods()
+            start_factorio()
+        else:
+            await ctx.respond(f"Update aborted, {OnlinePlayerCount} user(s) online")
+    else:
+        await ctx.respond("No mod updates found")
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Register a farmbot user for yourself")
