@@ -511,7 +511,7 @@ async def disableupdatenotifications(ctx):
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
         return
     if ctx.channel.id in userconfig['notification_channels']:
-        if userconfig['automatic_updates'] and len(userconfig['notification_channels']) == 1:
+        if (userconfig['automatic_updates'] or userconfig['automatic_mod_updates']) and len(userconfig['notification_channels']) == 1:
             await ctx.respond("Automatic updates are enabled, and no other channels have notifications enabled. Please disable automatic updates first, or enable notifications on a different channel.")
             return()
         userconfig['notification_channels'].remove(ctx.channel.id)
@@ -549,6 +549,34 @@ async def disableautomaticupdates(ctx):
     else:
         await ctx.respond("Automatic updates were not enabled, no changes made")
 
+
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Enable automatic mod updates")
+async def enableautomaticmodupdates(ctx):
+    RequiredPermissionLevel = 10
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    if len(userconfig['notification_channels']) == 0:
+        await ctx.respond("No update notification channels have been set, please enable update notifications first")
+        return()
+    if not userconfig['automatic_mod_updates']:
+        userconfig['automatic_mod_updates'] = True
+        write_userconfig()
+        await ctx.respond("Automatic mod updates enabled")
+    else:
+        await ctx.respond("Automatic mod updates were already enabled, no changes made")
+
+
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Disable automatic mod updates")
+async def disableautomaticmodupdates(ctx):
+    RequiredPermissionLevel = 10
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    if userconfig['automatic_mod_updates']:
+        userconfig['automatic_mod_updates'] = False
+        write_userconfig()
+        await ctx.respond("Automatic mod updates disabled")
+    else:
+        await ctx.respond("Automatic mod updates were not enabled, no changes made")
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Show online players")
 async def playersonline(ctx):
@@ -1202,7 +1230,15 @@ async def auto_update_check():
         PlayerCount = get_factorio_online_player_count()
         if PlayerCount == 0:
             await send_notification(f"Starting update from version `{VersionInfo['current']}` to version `{VersionInfo['latest_stable']}`, there are 0 players on the server.")
-            restart_factorio()
+            stop_factorio()
+            if userconfig['automatic_mod_updates']:
+                ModUpdates = get_factorio_mod_updates()
+                if ModUpdates:
+                    await send_notification(f"Mod Updates found:\n- `{'`\n- `'.join(ModUpdates)}`")
+                    update_factorio_mods()
+                else:
+                    await send_notification("No mod updates found")
+            start_factorio()
             time.sleep(10)
             await send_notification(f"Update complete\n{factorio_version_output(get_factorio_versions())}\n```\n{status_factorio()}\n```")
 
@@ -1225,6 +1261,8 @@ if 'notified_version' not in userconfig:
     userconfig['notified_version'] = ''
 if 'automatic_updates' not in userconfig:
     userconfig['automatic_updates'] = False
+if 'automatic_mod_updates' not in userconfig:
+    userconfig['automatic_mod_updates'] = False
 if 'farmbot_users' not in userconfig:
     userconfig['farmbot_users'] = []
 for Admin in CONFIG['farmbot_default_admin_discord_users']:
