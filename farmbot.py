@@ -642,7 +642,7 @@ async def addfactoriomod(ctx, mod_name: str):
 
 
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Remove mod from current factorio save. Stop factorio prior to use.")
-@option("mod_name", str, description="Mod to add; case sensitive", required=True)
+@option("mod_name", str, autocomplete=autocomplete_list_enabled_mods, description="Mod to add; case sensitive", required=True)
 async def removefactoriomod(ctx, mod_name: str):
     RequiredPermissionLevel = 10
     if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
