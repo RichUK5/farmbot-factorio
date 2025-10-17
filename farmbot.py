@@ -449,6 +449,17 @@ async def stopfactorio(ctx):
         await ctx.respond(f"Stop aborted, {OnlinePlayerCount} user(s) online")
 
 
+@bot.slash_command(guild_ids=CONFIG['guilds'], description="Forcibly stop Factorio server. This bypasses the online user check.")
+async def stopfactorioforce(ctx):
+    RequiredPermissionLevel = 10
+    if not await test_farmbot_user_permission_level(ctx, RequiredPermissionLevel):
+        return
+    await ctx.respond("Forcibly stopping Factorio")
+    stop_factorio()
+    time.sleep(1)
+    await ctx.respond(f"```\n{status_factorio()}\n```")
+
+
 @bot.slash_command(guild_ids=CONFIG['guilds'], description="Restart Factorio server")
 async def restartfactorio(ctx):
     RequiredPermissionLevel = 5
